@@ -1,0 +1,19 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "The Replication Observatory"
+  description: "A living report on journal replication outcomes."
+  page-footer: 
+    left: "Data provided by FLoRA and FORRT."
+    right: "Updated automatically."
+
+format:
+  html:
+    theme:
+      light: [cosmo, styles.css]
+      dark: [darkly, styles.css]
+    toc: true
+    toc-title: "Navigation"
+    css: styles.css
