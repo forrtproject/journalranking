@@ -149,6 +149,7 @@
       <nav class="main-nav">
         <a href="#publishers">Publishers</a>
         <a href="#targets">Targets</a>
+        <a href="#pottery">Pottery Barn</a>
         <a href="#data">Data Table</a>
         <a href="#about">About</a>
         <button class="dark-toggle" id="theme-toggle" aria-label="Toggle Dark Mode">
@@ -176,6 +177,10 @@
       <h2 id="targets">Targets of Replications</h2>
       <p>Conversely, which journals originally published the studies that are being replicated? A high number here indicates that many articles from this journal have been subject to replication attempts. Ideally, many studies from journals get replicated successfully.</p>
       <div id="plot-targets" style="height: 650px; width: 100%;"></div>
+
+      <h2 id="pottery">The Pottery Barn Rule</h2>
+      <p>Sanjay Srivastava suggested that if a journal publishes a study, it should also publish all subsequent replication attempts - similar to the pottery barn rule "you break it - you buy it". This plot shows for each journal the number of replications that repeated studies from the journal versus the total number of replications that targeted that journal.</p>
+      <div id="plot-pottery" style="height: 650px; width: 100%;"></div>
 
       <h2 id="data">Comprehensive Data Table of Targeted Studies</h2>
       <p>For a detailed, sortable view of all original targeted journals and their specific replication outcomes, please consult the table below.</p>
@@ -232,10 +237,13 @@
         'font.color': colors.text,
         'xaxis.gridcolor': colors.grid
       };
-      if (document.getElementById('plot-publishers').data) {
-        Plotly.relayout('plot-publishers', update);
-        Plotly.relayout('plot-targets', update);
-      }
+      // Apply updates to all three plots
+      const plots = ['plot-publishers', 'plot-targets', 'plot-pottery'];
+      plots.forEach(id => {
+        if (document.getElementById(id).data) {
+          Plotly.relayout(id, update);
+        }
+      });
     }
 
     // --- Data Processing ---
@@ -271,10 +279,12 @@
       // 2. Generate Summaries
       const publishersSummary = summarizeByColumn(cleaned, "journal_r");
       const targetsSummary = summarizeByColumn(cleaned, "journal_o");
+      const potterySummary = summarizePotteryBarn(cleaned);
 
       // 3. Render Visuals
       renderPlot('plot-publishers', publishersSummary, 'Number of Published Replications');
       renderPlot('plot-targets', targetsSummary, 'Number of Targeted Original Studies');
+      renderPotteryPlot('plot-pottery', potterySummary);
       renderTable(targetsSummary);
 
       // 4. Reveal UI
@@ -282,6 +292,7 @@
       document.getElementById('content').classList.remove('hidden');
     }
 
+    // Standard Summary function for the first two plots
     function summarizeByColumn(data, colName) {
       let counts = {};
       
@@ -298,7 +309,6 @@
         counts[journal].Total++;
       });
 
-      // Convert object to array and sort (Total Descending, then Successful Descending)
       let arr = Object.keys(counts).map(k => ({ journal: k, ...counts[k] }));
       arr.sort((a, b) => {
         if (b.Total !== a.Total) return b.Total - a.Total;
@@ -308,13 +318,75 @@
       return arr;
     }
 
-    // --- Plotly Integration & Custom Scrolling ---
+    // Specific Summary function for the Pottery Barn Rule plot
+    function summarizePotteryBarn(data) {
+      let counts = {};
+      
+      data.forEach(row => {
+        let j_o = row.journal_o;
+        let j_r = row.journal_r;
+        if (!j_o || j_o.trim() === "") return;
+
+        let j_o_clean = j_o.trim();
+        let j_r_clean = j_r ? j_r.trim() : "";
+
+        if (!counts[j_o_clean]) {
+          counts[j_o_clean] = { journal: j_o_clean, TotalTargeted: 0, SelfPublished: 0 };
+        }
+        
+        counts[j_o_clean].TotalTargeted++;
+        
+        // If the targeted journal matched the publishing journal exactly
+        if (j_o_clean.toLowerCase() === j_r_clean.toLowerCase()) {
+          counts[j_o_clean].SelfPublished++;
+        }
+      });
+
+      let arr = Object.values(counts);
+      // Sort by Total targeted, then by Self published
+      arr.sort((a, b) => {
+        if (b.TotalTargeted !== a.TotalTargeted) return b.TotalTargeted - a.TotalTargeted;
+        return b.SelfPublished - a.SelfPublished;
+      });
+      
+      return arr;
+    }
+
+    // --- Helper: Mouse Wheel Scrolling Logic ---
+    function addCustomScroll(divId, numItems) {
+      const plotContainer = document.getElementById(divId);
+      
+      plotContainer.addEventListener('wheel', function(e) {
+        e.preventDefault(); // Stop entire web page from scrolling while over plot
+        
+        const shift = e.deltaY / 60; 
+        
+        const currentRange = plotContainer.layout.yaxis.range;
+        let newStart = currentRange[0] + shift;
+        let newEnd = currentRange[1] + shift;
+
+        const minIndex = -0.5;
+        const maxIndex = numItems - 0.5;
+
+        // Bounding constraints
+        if (newEnd < minIndex) {
+          newEnd = minIndex;
+          newStart = 9.5; 
+        } else if (newStart > maxIndex) {
+          newStart = maxIndex;
+          newEnd = maxIndex - 10;
+        }
+
+        Plotly.relayout(plotContainer, {'yaxis.range': [newStart, newEnd]});
+      }, { passive: false });
+    }
+
+    // --- Plotly Integration (Standard Stacked) ---
     function renderPlot(divId, summaryData, xAxisTitle) {
       const yLabels = summaryData.map(d => d.journal);
       const colors = getThemeColors();
       const numItems = summaryData.length;
 
-      // Build a trace for each outcome category
       const traces = OUTCOMES.map(outcome => {
         return {
           y: yLabels,
@@ -336,11 +408,11 @@
         xaxis: { 
           title: xAxisTitle, 
           gridcolor: colors.grid,
-          fixedrange: true // Prevent horizontal zooming/panning
+          fixedrange: true 
         },
         yaxis: { 
           autorange: false,
-          range: [9.5, -0.5], // Exact Top 10 view (Reversed because descending)
+          range: [9.5, -0.5], // Exact Top 10 view
           fixedrange: false 
         },
         dragmode: 'pan' 
@@ -348,45 +420,78 @@
 
       const config = {
         responsive: true,
-        scrollZoom: false, // Turned OFF native zoom as requested
+        scrollZoom: false, // Custom JS scroll handles this now
         displayModeBar: false
       };
 
       Plotly.newPlot(divId, traces, layout, config).then(() => {
-        // --- CUSTOM VERTICAL PANNING LOGIC ---
-        // This makes mouse wheel directly scroll down the list of journals instead of zooming
-        const plotContainer = document.getElementById(divId);
-        
-        plotContainer.addEventListener('wheel', function(e) {
-          e.preventDefault(); // Stop entire web page from scrolling while over plot
-          
-          // Determine shift distance (smooth proportionality for trackpads vs mice)
-          const shift = e.deltaY / 60; 
-          
-          const currentRange = plotContainer.layout.yaxis.range;
-          let newStart = currentRange[0] + shift;
-          let newEnd = currentRange[1] + shift;
+        addCustomScroll(divId, numItems);
+      });
+    }
 
-          // Constraints so we don't scroll into empty white space
-          const minIndex = -0.5;
-          const maxIndex = numItems - 0.5;
+    // --- Plotly Integration (Pottery Barn Overlay) ---
+    function renderPotteryPlot(divId, summaryData) {
+      const yLabels = summaryData.map(d => d.journal);
+      const colors = getThemeColors();
+      const numItems = summaryData.length;
 
-          if (newEnd < minIndex) {
-            newEnd = minIndex;
-            newStart = 9.5; // Always keep 10 items in view
-          } else if (newStart > maxIndex) {
-            newStart = maxIndex;
-            newEnd = maxIndex - 10;
-          }
+      // Base Grey Bar (Total Targeted)
+      const traceTotal = {
+        y: yLabels,
+        x: summaryData.map(d => d.TotalTargeted),
+        name: 'Total Targeted',
+        type: 'bar',
+        orientation: 'h',
+        marker: { color: '#E0E0E0' }, // Light Grey
+        hoverinfo: 'x+name'
+      };
 
-          Plotly.relayout(plotContainer, {'yaxis.range': [newStart, newEnd]});
-        }, { passive: false });
+      // Overlay Blue Bar (Self-Published)
+      const traceSelf = {
+        y: yLabels,
+        x: summaryData.map(d => d.SelfPublished),
+        name: 'Published in Same Journal',
+        type: 'bar',
+        orientation: 'h',
+        marker: { color: '#3498db' }, // Professional Blue
+        opacity: 1, // Ensure solid color on top
+        hoverinfo: 'x+name'
+      };
+
+      const layout = {
+        barmode: 'overlay', // Crucial setting for Pottery Barn overlap
+        hovermode: 'y unified',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: colors.text, family: "-apple-system, sans-serif" },
+        margin: { l: 250, r: 20, t: 20, b: 50 },
+        xaxis: { 
+          title: 'Number of Replications', 
+          gridcolor: colors.grid,
+          fixedrange: true 
+        },
+        yaxis: { 
+          autorange: false,
+          range: [9.5, -0.5], 
+          fixedrange: false 
+        },
+        dragmode: 'pan' 
+      };
+
+      const config = {
+        responsive: true,
+        scrollZoom: false, 
+        displayModeBar: false
+      };
+
+      // Notice array order: traceTotal first (base), traceSelf second (top layer)
+      Plotly.newPlot(divId, [traceTotal, traceSelf], layout, config).then(() => {
+        addCustomScroll(divId, numItems);
       });
     }
 
     // --- DataTables Integration ---
     function renderTable(targetsSummary) {
-      // Format data array for DataTable
       const dataset = targetsSummary.map(d => {
         return [d.journal, d.Total, ...OUTCOMES.map(o => d[o])];
       });
@@ -400,7 +505,7 @@
       $('#data-table').DataTable({
         data: dataset,
         columns: columns,
-        order: [[1, 'desc']], // Sort by Total initially
+        order: [[1, 'desc']], 
         pageLength: 10,
         autoWidth: false,
         dom: '<"top"f>rt<"bottom"lip><"clear">',
