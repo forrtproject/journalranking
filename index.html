@@ -198,7 +198,7 @@
       </div>
 
       <p>Which journals are actively publishing replication attempts? The chart below highlights the top publishers. To prevent large-scale replication projects from skewing the results, multiple replications published within the same article (identified by DOI) are aggregated and counted as a single publication.</p>
-      <p><em>The chart displays the <strong>Top 10</strong> journals by default. NA means that the replication has not yet been published by a journal. <strong>Scroll your mouse wheel inside the bordered box</strong> to pan down the list of journals without scrolling the page.</em></p>
+      <p><em>The chart displays the <strong>Top 10</strong> journals by default. "Not published in a journal" means that the replication has not yet been published. <strong>Scroll your mouse wheel inside the bordered box</strong> to pan down the list of journals without scrolling the page.</em></p>
       <div class="plot-wrapper">
         <div id="plot-publishers" style="height: 650px; width: 100%;"></div>
       </div>
@@ -317,8 +317,15 @@
       cleaned.forEach(row => {
         let j_r = row.journal_r;
         if (!j_r || j_r.trim() === "") return;
+        j_r = j_r.trim();
+        
+        // Convert "NA" string to human-readable text
+        if (j_r.toUpperCase() === "NA") {
+          j_r = "Not published in a journal";
+        }
         
         let doi = row.doi_r ? row.doi_r.trim() : "";
+        if (doi.toUpperCase() === "NA") doi = ""; // Treat "NA" DOIs as blank
         
         if (doi !== "") {
           // If we haven't seen this DOI yet, add it
@@ -430,6 +437,25 @@
       return arr;
     }
 
+    // --- Helper: Line Breaking for Y-Axis Labels ---
+    function wrapText(text, maxChars) {
+      if (!text) return "";
+      const words = text.split(" ");
+      let lines = [];
+      let currentLine = "";
+
+      words.forEach(word => {
+        if (currentLine.length + word.length > maxChars) {
+          lines.push(currentLine.trim());
+          currentLine = word + " ";
+        } else {
+          currentLine += word + " ";
+        }
+      });
+      lines.push(currentLine.trim());
+      return lines.join("<br>");
+    }
+
     // --- Helper: Mouse Wheel Scrolling Logic ---
     function addCustomScroll(divId, numItems) {
       const plotContainer = document.getElementById(divId);
@@ -461,7 +487,8 @@
 
     // --- Plotly Integration (Standard Stacked) ---
     function renderPlot(divId, summaryData, xAxisTitle) {
-      const yLabels = summaryData.map(d => d.journal);
+      // Map yLabels using the wrapper function (max 35 chars per line)
+      const yLabels = summaryData.map(d => wrapText(d.journal, 35));
       const colors = getThemeColors();
       const numItems = summaryData.length;
 
@@ -475,7 +502,9 @@
           name: outcome,
           type: 'bar',
           orientation: 'h',
-          marker: { color: COLOR_MAP[outcome] }
+          marker: { color: COLOR_MAP[outcome] },
+          hovertext: summaryData.map(d => `${d.journal}<br>${outcome}: ${d[outcome]}`),
+          hoverinfo: 'text'
         };
       });
 
@@ -485,7 +514,7 @@
         plot_bgcolor: 'rgba(0,0,0,0)',
         paper_bgcolor: 'rgba(0,0,0,0)',
         font: { color: colors.text, family: "-apple-system, sans-serif" },
-        margin: { l: 250, r: 20, t: 20, b: 50 },
+        margin: { l: 260, r: 20, t: 20, b: 50 }, // Left margin handles max ~35 chars nicely
         xaxis: { 
           title: xAxisTitle, 
           gridcolor: colors.grid,
@@ -494,7 +523,8 @@
         yaxis: { 
           autorange: false,
           range: [9.5, -0.5], // Exact Top 10 view
-          fixedrange: false 
+          fixedrange: false,
+          tickfont: { size: 12 } 
         },
         dragmode: 'pan',
         legend: { traceorder: 'reversed' } // Re-reverse legend so "Successful" stays at top
@@ -513,7 +543,7 @@
 
     // --- Plotly Integration (Pottery Barn Overlay) ---
     function renderPotteryPlot(divId, summaryData) {
-      const yLabels = summaryData.map(d => d.journal);
+      const yLabels = summaryData.map(d => wrapText(d.journal, 35));
       const colors = getThemeColors();
       const numItems = summaryData.length;
 
@@ -525,7 +555,8 @@
         type: 'bar',
         orientation: 'h',
         marker: { color: '#E0E0E0' }, // Light Grey
-        hoverinfo: 'x+name'
+        hovertext: summaryData.map(d => `${d.journal}<br>Total Targeted: ${d.TotalTargeted}`),
+        hoverinfo: 'text'
       };
 
       // Overlay Blue Bar (Self-Published)
@@ -537,7 +568,8 @@
         orientation: 'h',
         marker: { color: '#3498db' }, // Professional Blue
         opacity: 1, // Ensure solid color on top
-        hoverinfo: 'x+name'
+        hovertext: summaryData.map(d => `${d.journal}<br>Self-Published: ${d.SelfPublished}`),
+        hoverinfo: 'text'
       };
 
       const layout = {
@@ -546,7 +578,7 @@
         plot_bgcolor: 'rgba(0,0,0,0)',
         paper_bgcolor: 'rgba(0,0,0,0)',
         font: { color: colors.text, family: "-apple-system, sans-serif" },
-        margin: { l: 250, r: 20, t: 20, b: 50 },
+        margin: { l: 260, r: 20, t: 20, b: 50 },
         xaxis: { 
           title: 'Number of Replications', 
           gridcolor: colors.grid,
@@ -555,7 +587,8 @@
         yaxis: { 
           autorange: false,
           range: [9.5, -0.5], 
-          fixedrange: false 
+          fixedrange: false,
+          tickfont: { size: 12 }
         },
         dragmode: 'pan' 
       };
