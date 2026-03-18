@@ -1,6 +1,9 @@
 project:
   type: website
   output-dir: docs
+  render:
+    - "*.qmd"       # Render all Quarto files
+    - "!README.md"  # Explicitly tell Quarto to ignore the README
 
 website:
   title: "The Replication Observatory"
