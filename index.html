@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Journal Replication Rankings</title>
+  <title>The Journal Replicability Tracker</title>
   
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -121,6 +121,28 @@
     }
     .asterisk-note { font-size: 0.9rem; color: var(--text-muted); margin-top: 15px; }
 
+    /* --- Caveat Box --- */
+    .caveat-box {
+      border-left: 4px solid var(--text-muted);
+      padding: 15px 20px;
+      margin: 15px 0 25px 0;
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-style: italic;
+      background: transparent;
+    }
+
+    /* --- Plot Wrapper for Scroll Bounds --- */
+    .plot-wrapper {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+      background-color: transparent;
+    }
+
     /* --- DataTables Overrides --- */
     .dataTables_wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 0.9rem; margin-top: 20px; }
     table.dataTable { border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-bottom: 20px !important; }
@@ -170,17 +192,28 @@
     <div id="content" class="hidden">
       
       <h2 id="publishers">Publishers of Replications</h2>
-      <p>Which journals are actively publishing replication attempts? The chart below highlights the top publishers. Note that this view includes large-scale replication attempts, where one paper with up to 160 replications is published at once and often without reference to the target studies.</p>
-      <p><em>The chart displays the <strong>Top 10</strong> journals by default. NA means that the replication has not yet been published by a journal. <strong>Scroll your mouse wheel</strong> over the chart to pan down the list of journals.</em></p>
-      <div id="plot-publishers" style="height: 650px; width: 100%;"></div>
+      
+      <div class="caveat-box">
+        <strong>Caveat:</strong> While it is the aim to be comprehensive, FLoRA does not yet contain all replications in existence.
+      </div>
+
+      <p>Which journals are actively publishing replication attempts? The chart below highlights the top publishers. To prevent large-scale replication projects from skewing the results, multiple replications published within the same article (identified by DOI) are aggregated and counted as a single publication.</p>
+      <p><em>The chart displays the <strong>Top 10</strong> journals by default. NA means that the replication has not yet been published by a journal. <strong>Scroll your mouse wheel inside the bordered box</strong> to pan down the list of journals without scrolling the page.</em></p>
+      <div class="plot-wrapper">
+        <div id="plot-publishers" style="height: 650px; width: 100%;"></div>
+      </div>
 
       <h2 id="targets">Targets of Replications</h2>
       <p>Conversely, which journals originally published the studies that are being replicated? A high number here indicates that many articles from this journal have been subject to replication attempts. Ideally, many studies from journals get replicated successfully.</p>
-      <div id="plot-targets" style="height: 650px; width: 100%;"></div>
+      <div class="plot-wrapper">
+        <div id="plot-targets" style="height: 650px; width: 100%;"></div>
+      </div>
 
       <h2 id="pottery">The Pottery Barn Rule</h2>
-      <p>Sanjay Srivastava suggested that if a journal publishes a study, it should also publish all subsequent replication attempts - similar to the pottery barn rule "you break it - you buy it" (https://thehardestscience.com/2012/09/27/a-pottery-barn-rule-for-scientific-journals). This plot shows for each journal the number of replications that repeated studies from the journal versus the total number of replications that targeted that journal.</p>
-      <div id="plot-pottery" style="height: 650px; width: 100%;"></div>
+      <p>Sanjay Srivastava suggested that if a journal publishes a study, it should also publish all subsequent replication attempts - similar to the pottery barn rule "you break it - you buy it" (<a href="https://thehardestscience.com/2012/09/27/a-pottery-barn-rule-for-scientific-journals" target="_blank">https://thehardestscience.com/2012/09/27/a-pottery-barn-rule-for-scientific-journals</a>). This plot shows for each journal the number of replications that repeated studies from the journal versus the total number of replications that targeted that journal.</p>
+      <div class="plot-wrapper">
+        <div id="plot-pottery" style="height: 650px; width: 100%;"></div>
+      </div>
 
       <h2 id="data">Comprehensive Data Table of Targeted Studies</h2>
       <p>For a detailed, sortable view of all original targeted journals and their specific replication outcomes, please consult the table below.</p>
@@ -206,6 +239,7 @@
     // --- Configuration ---
     const DATA_URL = "https://raw.githubusercontent.com/forrtproject/FReD-data/refs/heads/main/output/flora.csv";
     
+    // Order defined here maps to coloring
     const COLOR_MAP = {
       "Successful": "#4CAF50",
       "Mixed": "#FFB300",
@@ -257,7 +291,7 @@
     });
 
     function processData(rawData) {
-      // 1. Filter and Clean 
+      // 1. Filter and Clean base data
       let cleaned = [];
       rawData.forEach(row => {
         if (row.type && row.type.toLowerCase().trim() === 'replication') {
@@ -276,13 +310,57 @@
         }
       });
 
+      // 1b. Aggregate logic specifically for Publishers (Group by doi_r)
+      let uniquePublishersMap = new Map();
+      let noDoiPublishers = [];
+
+      cleaned.forEach(row => {
+        let j_r = row.journal_r;
+        if (!j_r || j_r.trim() === "") return;
+        
+        let doi = row.doi_r ? row.doi_r.trim() : "";
+        
+        if (doi !== "") {
+          // If we haven't seen this DOI yet, add it
+          if (!uniquePublishersMap.has(doi)) {
+            uniquePublishersMap.set(doi, { 
+              journal_r: j_r, 
+              outcomes: new Set([row.standardOutcome]) 
+            });
+          } else {
+            // If we have seen it, just log the outcome to the Set
+            uniquePublishersMap.get(doi).outcomes.add(row.standardOutcome);
+          }
+        } else {
+          // If no DOI, fallback to treating it as its own unique study
+          noDoiPublishers.push({
+            journal_r: j_r,
+            standardOutcome: row.standardOutcome
+          });
+        }
+      });
+
+      // Flatten map back into an array format for the plotting function
+      let publishersData = [...noDoiPublishers];
+      uniquePublishersMap.forEach((val, key) => {
+        // If a single DOI yielded different types of outcomes, mark the overall paper as "Mixed"
+        let finalOutcome = val.outcomes.size > 1 ? "Mixed" : Array.from(val.outcomes)[0];
+        publishersData.push({
+          journal_r: val.journal_r,
+          standardOutcome: finalOutcome
+        });
+      });
+
+
       // 2. Generate Summaries
-      const publishersSummary = summarizeByColumn(cleaned, "journal_r");
+      // Use the aggregated DOI data specifically for the publishers plot
+      const publishersSummary = summarizeByColumn(publishersData, "journal_r");
+      // Use the standard raw row data for targets and pottery barn rules
       const targetsSummary = summarizeByColumn(cleaned, "journal_o");
       const potterySummary = summarizePotteryBarn(cleaned);
 
       // 3. Render Visuals
-      renderPlot('plot-publishers', publishersSummary, 'Number of Published Replications');
+      renderPlot('plot-publishers', publishersSummary, 'Number of Published Replications (Aggregated by DOI)');
       renderPlot('plot-targets', targetsSummary, 'Number of Targeted Original Studies');
       renderPotteryPlot('plot-pottery', potterySummary);
       renderTable(targetsSummary);
@@ -387,7 +465,10 @@
       const colors = getThemeColors();
       const numItems = summaryData.length;
 
-      const traces = OUTCOMES.map(outcome => {
+      // Reverse the order of outcomes so "Successful" is drawn last (appears on top visually)
+      const reversedOutcomes = [...OUTCOMES].reverse();
+
+      const traces = reversedOutcomes.map(outcome => {
         return {
           y: yLabels,
           x: summaryData.map(d => d[outcome]),
@@ -415,7 +496,8 @@
           range: [9.5, -0.5], // Exact Top 10 view
           fixedrange: false 
         },
-        dragmode: 'pan' 
+        dragmode: 'pan',
+        legend: { traceorder: 'reversed' } // Re-reverse legend so "Successful" stays at top
       };
 
       const config = {
