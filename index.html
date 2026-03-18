@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Replication Observatory</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" rel="stylesheet">
+  
+  <!-- Libraries (Plotly, DataTables, PapaParse for CSV) -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+
+  <style>
+    :root {
+      --ink: #1c1917;
+      --cream: #faf8f4;
+      --gold: #9a7b4f;
+      --rule: #d6d0c4;
+      
+      --bg: var(--cream);
+      --text: var(--ink);
+      --text-muted: #57534e;
+      --link: var(--gold);
+      --border: var(--rule);
+      --table-hover: rgba(154, 123, 79, 0.05);
+    }
+
+    html.dark-mode {
+      --ink: #faf8f4;
+      --cream: #151413;
+      --gold: #c4a679;
+      --rule: #3d3935;
+      --text-muted: #a8a29e;
+      --table-hover: rgba(196, 166, 121, 0.05);
+    }
+
+    body {
+      font-family: 'Newsreader', serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 1.15rem;
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* --- Content Headlines --- */
+    h1, h2, h3 { font-weight: 400; color: var(--text); }
+    h2 {
+      border: 1px solid var(--border);
+      padding: 20px 30px;
+      margin-top: 2.5em;
+      margin-bottom: 1.5em;
+      background-color: var(--table-hover);
+      font-size: 1.8rem;
+    }
+
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 20px 60px 20px; }
+
+    /* --- HEADER Redesign --- */
+    .site-header { margin-bottom: 50px; }
+    .header-top {
+      text-align: center;
+      padding: 50px 0 30px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .site-title { margin: 0 0 10px 0; font-size: 3.2rem; font-weight: 400; color: var(--text); }
+    .sub-headline {
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.15em;
+      font-size: 0.75rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .nav-wrapper { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg); }
+    .main-nav { display: flex; justify-content: center; align-items: center; flex-wrap: nowrap; }
+    .main-nav a, .dark-toggle {
+      color: var(--text); text-decoration: none; font-size: 0.9rem; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.05em; padding: 15px 25px;
+      transition: color 0.2s, background 0.2s; border-right: 1px solid var(--border); white-space: nowrap;
+    }
+    .main-nav a:first-child { border-left: 1px solid var(--border); }
+    .main-nav a:hover { color: var(--gold); background: var(--table-hover); }
+
+    /* --- Dark Toggle --- */
+    .dark-toggle {
+      background: none; cursor: pointer; border-top: none; border-bottom: none; border-left: none;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dark-toggle:hover { color: var(--gold); }
+    .dark-toggle svg { width: 18px; height: 18px; fill: currentColor; }
+    .sun-icon { display: block; }
+    .moon-icon { display: none; }
+    html.dark-mode .sun-icon { display: none; }
+    html.dark-mode .moon-icon { display: block; }
+
+    /* --- GLOBAL STYLES --- */
+    a { color: var(--gold); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px;}
+    a:hover { color: var(--text); }
+
+    /* --- DataTables Overrides --- */
+    .dataTables_wrapper { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 0.9rem; margin-top: 20px; }
+    table.dataTable { border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); margin-bottom: 20px !important; }
+    table.dataTable thead th { border-bottom: 1px solid var(--ink) !important; color: var(--text) !important; text-transform: uppercase; letter-spacing: 0.05em; }
+    table.dataTable tbody tr { background-color: transparent !important; }
+    table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; color: var(--text) !important; }
+    table.dataTable tbody tr:hover { background-color: var(--table-hover) !important; }
+    .dataTables_length, .dataTables_filter, .dataTables_info, .dataTables_paginate { color: var(--text) !important; }
+    .dataTables_wrapper .dataTables_filter input { border: 1px solid var(--border); color: var(--text); margin-left: 10px; padding: 4px 8px;}
+    .dataTables_wrapper .dataTables_length select { border: 1px solid var(--border); color: var(--text); }
+
+    /* --- Loader --- */
+    #loader { text-align: center; padding: 50px; font-size: 1.2rem; color: var(--text-muted); font-style: italic; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-top">
+      <h1 class="site-title">The Replication Observatory</h1>
+      <div class="sub-headline">A Living Report on Journal Practices &middot; Powered by FLoRA</div>
+    </div>
+    
+    <div class="nav-wrapper">
+      <nav class="main-nav">
+        <a href="#publishers">Publishers</a>
+        <a href="#targets">Targets</a>
+        <a href="#data">Data Table</a>
+        <button class="dark-toggle" id="theme-toggle" aria-label="Toggle Dark Mode">
+          <svg class="sun-icon" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    <p>Science is a cumulative endeavor. To understand the robustness of our literature, we must track not only <em>what</em> is replicated, but <em>where</em> these conversations happen. This living report dynamically connects to the <a href="https://forrt.org/" target="_blank">FLoRA database</a> to provide an up-to-date overview of replication outcomes across academic journals.</p>
+
+    <!-- Loading State -->
+    <div id="loader">Fetching live data from FLoRA...</div>
+
+    <!-- Hidden Content (Revealed after data loads) -->
+    <div id="content" class="hidden">
+      
+      <h2 id="publishers">Publishers of Replications</h2>
+      <p>Which journals are driving the open science movement by actively publishing replication attempts? The chart below highlights the top publishers.</p>
+      <p><em>💡 <strong>Tip:</strong> The chart displays the <strong>Top 10</strong> journals by default. <strong>Use your mouse wheel</strong> or <strong>click and drag vertically</strong> inside the chart to scroll down and view the remaining journals.</em></p>
+      <div id="plot-publishers" style="height: 650px; width: 100%;"></div>
+
+      <h2 id="targets">Targets of Replications</h2>
+      <p>Conversely, which journals originally published the studies that are being replicated? A high number here indicates high impact and scrutiny, a natural part of the scientific lifecycle.</p>
+      <div id="plot-targets" style="height: 650px; width: 100%;"></div>
+
+      <h2 id="data">Comprehensive Data Table</h2>
+      <p>For a detailed, sortable view of all original targeted journals and their specific replication outcomes, please consult the table below.</p>
+      <table id="data-table" class="display" style="width:100%"></table>
+
+    </div>
+  </div>
+
+  <script>
+    // --- Configuration ---
+    const DATA_URL = "https://raw.githubusercontent.com/forrtproject/FReD-data/refs/heads/main/output/flora.csv";
+    
+    const COLOR_MAP = {
+      "Successful": "#4CAF50",
+      "Mixed": "#FFB300",
+      "Failed": "#E53935",
+      "Uninformative": "#9E9E9E",
+      "Descriptive Only": "#BDBDBD",
+      "Stat. Successful but Flawed": "#757575",
+      "Other": "#E0E0E0"
+    };
+    const OUTCOMES = Object.keys(COLOR_MAP);
+
+    // --- Dark Mode Logic ---
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark-mode');
+      updatePlotThemes();
+    });
+
+    function getThemeColors() {
+      const isDark = document.documentElement.classList.contains('dark-mode');
+      return {
+        text: isDark ? '#faf8f4' : '#1c1917',
+        grid: isDark ? '#3d3935' : '#d6d0c4'
+      };
+    }
+
+    function updatePlotThemes() {
+      const colors = getThemeColors();
+      const update = {
+        'font.color': colors.text,
+        'xaxis.gridcolor': colors.grid
+      };
+      if (document.getElementById('plot-publishers').data) {
+        Plotly.relayout('plot-publishers', update);
+        Plotly.relayout('plot-targets', update);
+      }
+    }
+
+    // --- Data Processing ---
+    Papa.parse(DATA_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        processData(results.data);
+      }
+    });
+
+    function processData(rawData) {
+      // 1. Filter and Clean (Equivalent to dplyr filter & case_when)
+      let cleaned = [];
+      rawData.forEach(row => {
+        if (row.type && row.type.toLowerCase().trim() === 'replication') {
+          let out = (row.outcome || "").toLowerCase().trim();
+          let standardOut = "Other";
+          
+          if(out === "successful") standardOut = "Successful";
+          else if(out === "failed") standardOut = "Failed";
+          else if(out === "mixed") standardOut = "Mixed";
+          else if(out === "uninformative") standardOut = "Uninformative";
+          else if(out === "descriptive only") standardOut = "Descriptive Only";
+          else if(out === "statistically successful but flawed") standardOut = "Stat. Successful but Flawed";
+          
+          row.standardOutcome = standardOut;
+          cleaned.push(row);
+        }
+      });
+
+      // 2. Generate Summaries
+      const publishersSummary = summarizeByColumn(cleaned, "journal_r");
+      const targetsSummary = summarizeByColumn(cleaned, "journal_o");
+
+      // 3. Render Visuals
+      renderPlot('plot-publishers', publishersSummary, 'Number of Published Replications');
+      renderPlot('plot-targets', targetsSummary, 'Number of Targeted Original Studies');
+      renderTable(targetsSummary);
+
+      // 4. Reveal UI
+      document.getElementById('loader').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+    }
+
+    function summarizeByColumn(data, colName) {
+      let counts = {};
+      
+      data.forEach(row => {
+        let journal = row[colName];
+        if (!journal || journal.trim() === "") return;
+        
+        if (!counts[journal]) {
+          counts[journal] = { Total: 0 };
+          OUTCOMES.forEach(o => counts[journal][o] = 0);
+        }
+        
+        counts[journal][row.standardOutcome]++;
+        counts[journal].Total++;
+      });
+
+      // Convert object to array and sort (Total Descending, then Successful Descending)
+      let arr = Object.keys(counts).map(k => ({ journal: k, ...counts[k] }));
+      arr.sort((a, b) => {
+        if (b.Total !== a.Total) return b.Total - a.Total;
+        return b.Successful - a.Successful;
+      });
+      
+      return arr;
+    }
+
+    // --- Plotly Integration ---
+    function renderPlot(divId, summaryData, xAxisTitle) {
+      const yLabels = summaryData.map(d => d.journal);
+      const colors = getThemeColors();
+
+      // Build a trace for each outcome category
+      const traces = OUTCOMES.map(outcome => {
+        return {
+          y: yLabels,
+          x: summaryData.map(d => d[outcome]),
+          name: outcome,
+          type: 'bar',
+          orientation: 'h',
+          marker: { color: COLOR_MAP[outcome] }
+        };
+      });
+
+      const layout = {
+        barmode: 'stack',
+        hovermode: 'y unified',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: colors.text, family: "-apple-system, sans-serif" },
+        margin: { l: 250, r: 20, t: 20, b: 50 },
+        xaxis: { 
+          title: xAxisTitle, 
+          gridcolor: colors.grid,
+          fixedrange: true // Prevent horizontal zooming
+        },
+        yaxis: { 
+          autorange: false,
+          range: [9.5, -0.5], // Exact Top 10 view
+          fixedrange: false // Allow vertical scrolling/panning
+        },
+        dragmode: 'pan' // Mouse click & drag to scroll
+      };
+
+      const config = {
+        responsive: true,
+        scrollZoom: true, // Allow mouse wheel scrolling
+        displayModeBar: false
+      };
+
+      Plotly.newPlot(divId, traces, layout, config);
+    }
+
+    // --- DataTables Integration ---
+    function renderTable(targetsSummary) {
+      // Format data array for DataTable
+      const dataset = targetsSummary.map(d => {
+        return [d.journal, d.Total, ...OUTCOMES.map(o => d[o])];
+      });
+
+      // Format headers
+      const columns = [
+        { title: "Original Journal" },
+        { title: "Total" },
+        ...OUTCOMES.map(o => ({ title: o }))
+      ];
+
+      $('#data-table').DataTable({
+        data: dataset,
+        columns: columns,
+        order: [[1, 'desc']], // Sort by Total initially
+        pageLength: 10,
+        autoWidth: false,
+        dom: '<"top"f>rt<"bottom"lip><"clear">',
+        language: { search: "Filter journals:" }
+      });
+    }
+  </script>
+</body>
+</html>

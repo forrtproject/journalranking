@@ -2,7 +2,7 @@
 
 Ranks Academic Journal based on their replication rates
 
-This living report was created by Lukas Röseler with Gemini 3.1 Pro Preview.
+This living report was created by Lukas Röseler with Gemini 3.1 Pro Preview and is shared under a CC-BY 4.0 license.
 
 The data used is the FORRT Library of Reproduction and Replication Attempts (CC-BY 4.0 license). See here for up to date recommended citation: <https://github.com/forrtproject/FReD-data/blob/main/output/citation.txt>
 
